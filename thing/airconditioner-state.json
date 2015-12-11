@@ -1,0 +1,7 @@
+{
+    "power" : true,
+    "presetTemperature" : 28,
+    "fanSpeed" : 5,
+    "currentTemperature" : 25,
+    "currentHumidity" : 50
+}
