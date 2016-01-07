@@ -17,7 +17,6 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.android.gms.gcm.GoogleCloudMessaging;
-import com.kii.app.android.gcm.GCMPreference;
 import com.kii.app.android.gcm.KiiPushBroadcastReceiver;
 import com.kii.app.android.thingifsample.schema.airconditioner.AirConditionerSchema;
 import com.kii.app.android.thingifsample.schema.airconditioner.AirConditionerState;
@@ -54,13 +53,13 @@ import java.util.List;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener, KiiPushBroadcastReceiver.Observer {
 
-    private static final String SENDER_ID = "__GCM Project ID__";
-    private final String APP_ID = "__APP ID__";
-    private final String APP_KEY = "__APP KEY__";
-    private final String USER_NAME = "__user id__";
-    private final String PASSWORD = "__user pass_";
-    private final String VENDOR_THIMG_ID = "__vendor thing id__";
-    private final String THING_PASSWORD = "__thing pass__";
+    private static final String SENDER_ID = "__GCM_Project_ID__";
+    private final String APP_ID = "__APP_ID__";
+    private final String APP_KEY = "__APP_KEY__";
+    private final String USER_NAME = "__user_id__";
+    private final String PASSWORD = "__user_pass_";
+    private final String VENDOR_THING_ID = "__vendor_thing_id__";
+    private final String THING_PASSWORD = "__thing_pass__";
 
     private GoogleCloudMessaging gcm;
     private String regId;
@@ -105,15 +104,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
         //GCMインスタンスの取得
         gcm = GoogleCloudMessaging.getInstance(this.getApplicationContext());
-        //保存済デバイスIDの取得
-        regId = GCMPreference.getRegistrationId(this.getApplicationContext());
-        if (regId.isEmpty()) {
-            //保存済デバイスIDがない場合は新規にデバイスを登録
-            registerGCM();
-        } else {
-            //保存済デバイスIDがある場合はアプリにログイン
-            userLogin();
-        }
+
+        //デバイスを登録
+        registerGCM();
     }
 
     //Kii cloudアプリへのログイン
@@ -171,7 +164,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             @Override
             protected Boolean doInBackground(Void... params) {
                 try {
-                    Target target = api.onboard(VENDOR_THIMG_ID, THING_PASSWORD, null, null);
+                    Target target = api.onboard(VENDOR_THING_ID, THING_PASSWORD, null, null);
                     debug(target.getAccessToken());
                     debug(target.getTypedID().toString());
                     return Boolean.TRUE;
@@ -347,87 +340,36 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }
     }
 
-    //ボタン押下時の処理
-    @Override
-    public void onClick(View v) {
-        switch (v.getId()) {
-            case R.id.buttonRefresh:
-                getCurrentState();
-                break;
-            case R.id.buttonSend:
-                sendCommand();
-                break;
-            case R.id.buttonSet:
-                setTrigger();
-                break;
-        }
-    }
+    //トリガーの削除
+    private void deleteTrigger() {
+        debug("deleteTrigger start");
+        new AsyncTask<Void, Void, Boolean>() {
+            @Override
+            protected Boolean doInBackground(Void... params) {
+                try {
+                    String paginationKey = null;
+                    do {
+                        // Get the list of triggers
+                        Pair<List<Trigger>, String> results = api.listTriggers(0, paginationKey);
+                        List<Trigger> triggers = results.first;
 
-    //シークバー操作時の処理
-    private OnSeekBarChangeListener SeekListener = new OnSeekBarChangeListener() {
-        @Override
-        public void onStartTrackingTouch(SeekBar seekBar) {
-        }
-        @Override
-        public void onProgressChanged(SeekBar seekBar, int progress, boolean byUser) {
-            switch (seekBar.getId()) {
-                case R.id.seekBarPresetTemp:
-                    debug("value = " + seekBar.getProgress());
-                    setCommandPresetTempText();
-                    break;
-                case R.id.seekBarFanSpeed:
-                    debug("value = " + seekBar.getProgress());
-                    setCommandFanSpeedText();
-                    break;
-                case R.id.seekBarTemperature:
-                    debug("value = " + seekBar.getProgress());
-                    setTriggerTemperatureText();
-                    break;
-                default:
-                    break;
+                        // Doing something with each triggers
+                        for (Trigger trigger : triggers) {
+                            debug("triggerId = " + trigger.getTriggerID());
+                            api.deleteTrigger(trigger.getTriggerID());
+                        }
 
+                        // Check the next page
+                        paginationKey = results.second;
+                    } while (paginationKey != null);
+                    debug("deleteTrigger end");
+                    return true;
+                } catch (ThingIFException e) {
+                    debug("deleteTrigger error :" + e.getLocalizedMessage());
+                    return false;
+                }
             }
-        }
-        @Override
-        public void onStopTrackingTouch(SeekBar seekBar) {
-        }
-    };
-
-    //powerスイッチ変更時の処理
-    public void onSwitchPowerClicked(View view){
-        setCommandPowerText();
-    }
-
-    private void setCommandPowerText(){
-        ((TextView)findViewById(R.id.textCommandPower)).setText(getSwitchPowerValue() ? "ON" : "OFF");
-    }
-
-    private boolean getSwitchPowerValue(){
-        return ((Switch)findViewById(R.id.switchPower)).isChecked();
-    }
-
-    private void setCommandPresetTempText(){
-        ((TextView)findViewById(R.id.textCommandPresetTemp)).setText(String.valueOf(getSeekBarPresetTempValue()));
-    }
-
-    private int getSeekBarPresetTempValue(){
-        return ((SeekBar)findViewById(R.id.seekBarPresetTemp)).getProgress() + 18;
-    }
-
-    private void setCommandFanSpeedText(){
-        ((TextView)findViewById(R.id.textCommandFanSpeed)).setText(String.valueOf(getSeekBarFanSpeedValue()));
-    }
-
-    private int getSeekBarFanSpeedValue(){
-        return ((SeekBar)findViewById(R.id.seekBarFanSpeed)).getProgress();
-    }
-
-    private void setTriggerTemperatureText(){
-        ((TextView)findViewById(R.id.textTriggerTemperature)).setText(String.valueOf(getSeekBarTemperatureValue()));
-    }
-
-    private int getSeekBarTemperatureValue(){
-        return ((SeekBar)findViewById(R.id.seekBarTemperature)).getProgress() + 18;
+        }.execute();
     }
 
     //GCMへのデバイスの登録
@@ -439,7 +381,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 try {
                     // call register
                     regId = gcm.register(SENDER_ID);
-                    GCMPreference.setRegistrationId(MainActivity.this.getApplicationContext(), regId);
                     debug("registerGCM end");
                     userLogin();
                     return true;
@@ -498,37 +439,98 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }.execute();
     }
 
-    //トリガーの削除
-    private void deleteTrigger() {
-        debug("deleteTrigger start");
-        new AsyncTask<Void, Void, Boolean>() {
-            @Override
-            protected Boolean doInBackground(Void... params) {
-                try {
-                    String paginationKey = null;
-                    do {
-                        // Get the list of triggers
-                        Pair<List<Trigger>, String> results = api.listTriggers(0, paginationKey);
-                        List<Trigger> triggers = results.first;
-
-                        // Doing something with each triggers
-                        for (Trigger trigger : triggers) {
-                            debug("triggerId = " + trigger.getTriggerID());
-                            api.deleteTrigger(trigger.getTriggerID());
-                        }
-
-                        // Check the next page
-                        paginationKey = results.second;
-                    } while (paginationKey != null);
-                    debug("deleteTrigger end");
-                    return true;
-                } catch (ThingIFException e) {
-                    debug("deleteTrigger error :" + e.getLocalizedMessage());
-                    return false;
-                }
-            }
-        }.execute();
+    /*************************************************/
+    // 以下はボタンやシークバー関連の処理
+    /*************************************************/
+    //ボタン押下時の処理
+    @Override
+    public void onClick(View v) {
+        switch (v.getId()) {
+            case R.id.buttonRefresh:
+                // REFRESHボタン
+                getCurrentState();
+                break;
+            case R.id.buttonSend:
+                // SENDボタン
+                sendCommand();
+                break;
+            case R.id.buttonSet:
+                // SETボタン
+                setTrigger();
+                break;
+        }
     }
+
+    //シークバー操作時の処理
+    private OnSeekBarChangeListener SeekListener = new OnSeekBarChangeListener() {
+        @Override
+        public void onStartTrackingTouch(SeekBar seekBar) {
+        }
+        @Override
+        public void onProgressChanged(SeekBar seekBar, int progress, boolean byUser) {
+            switch (seekBar.getId()) {
+                case R.id.seekBarPresetTemp:
+                    // Preset Tempシークバー
+                    debug("value = " + seekBar.getProgress());
+                    setCommandPresetTempText();
+                    break;
+                case R.id.seekBarFanSpeed:
+                    // Fan Speedシークバー
+                    debug("value = " + seekBar.getProgress());
+                    setCommandFanSpeedText();
+                    break;
+                case R.id.seekBarTemperature:
+                    // Temperatureシークバー
+                    debug("value = " + seekBar.getProgress());
+                    setTriggerTemperatureText();
+                    break;
+                default:
+                    break;
+
+            }
+        }
+        @Override
+        public void onStopTrackingTouch(SeekBar seekBar) {
+        }
+    };
+
+    // Powerスイッチのクッリク時の処理
+    public void onSwitchPowerClicked(View view){
+        setCommandPowerText();
+    }
+    // PowerスイッチのON/OFFのテキスト表示切替
+    private void setCommandPowerText(){
+        ((TextView)findViewById(R.id.textCommandPower)).setText(getSwitchPowerValue() ? "ON" : "OFF");
+    }
+    // Powerスイッチの値の取得
+    private boolean getSwitchPowerValue(){
+        return ((Switch)findViewById(R.id.switchPower)).isChecked();
+    }
+    // Preset Tempの値の表示
+    private void setCommandPresetTempText(){
+        ((TextView)findViewById(R.id.textCommandPresetTemp)).setText(String.valueOf(getSeekBarPresetTempValue()));
+    }
+    // Preset Tempの値の取得
+    private int getSeekBarPresetTempValue(){
+        return ((SeekBar)findViewById(R.id.seekBarPresetTemp)).getProgress() + 18;
+    }
+    // Fan Speedの値の表示
+    private void setCommandFanSpeedText(){
+        ((TextView)findViewById(R.id.textCommandFanSpeed)).setText(String.valueOf(getSeekBarFanSpeedValue()));
+    }
+    // Fan Speedの値の取得
+    private int getSeekBarFanSpeedValue(){
+        return ((SeekBar)findViewById(R.id.seekBarFanSpeed)).getProgress();
+    }
+    // Temperatureの値の表示
+    private void setTriggerTemperatureText(){
+        ((TextView)findViewById(R.id.textTriggerTemperature)).setText(String.valueOf(getSeekBarTemperatureValue()));
+    }
+    // Temperatureの値の取得
+    private int getSeekBarTemperatureValue(){
+        return ((SeekBar)findViewById(R.id.seekBarTemperature)).getProgress() + 18;
+    }
+    /*************************************************/
 
     //ログ
     private static void debug(String message){
